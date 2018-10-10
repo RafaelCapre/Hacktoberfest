@@ -1,0 +1,139 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: {{ template "hacktoberfest.fullname" . }}
+  labels:
+    app: {{ template "hacktoberfest.fullname" . }}
+    chart: {{ template "hacktoberfest.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ template "hacktoberfest.fullname" . }}
+      release: {{ .Release.Name }}
+  template: 
+    metadata:
+      labels:
+        app: {{ template "hacktoberfest.fullname" . }} 
+        release: {{ .Release.Name }}
+    spec:
+      securityContext:
+          fsGroup: 2000
+      volumeMounts:
+          name: {{ template "hacktoberfest.fullname" . }}
+      containers:
+        - name: {{ template "hacktoberfest.fullname" . }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          volumeMounts:
+          - mountPath: /data/drools
+            name: {{ template "hacktoberfest.fullname" . }}
+          envFrom:
+          - configMapRef:
+              name: env-data
+          env:
+{{- with .Values.env }}
+{{ toYaml . | indent 10 }}
+{{- end }}
+{{- if  eq (index .Values "deployment" "annotations" "k8s.hacktoberfest.com.br/occ") "true" }}
+          - name: OCC_AUTH_API_KEY
+            valueFrom:
+              secretKeyRef: 
+                name: {{ template "hacktoberfest.fullname" . }}-occ
+                key: occ_auth_api_key
+{{- end }}
+{{- if  eq (index .Values "deployment" "annotations" "k8s.hacktoberfest.com.br/db-rabbitmq") "true" }}
+          - name: RABBIT_HOST
+            valueFrom:
+              secretKeyRef: 
+                name: {{ template "hacktoberfest.fullname" . }}-rabbit-mq
+                key: host
+          - name: RABBIT_PORT
+            valueFrom:
+              secretKeyRef: 
+                name: {{ template "hacktoberfest.fullname" . }}-rabbit-mq
+                key: port
+          - name: RABBIT_USERNAME
+            valueFrom:
+              secretKeyRef: 
+                name: {{ template "hacktoberfest.fullname" . }}-rabbit-mq
+                key: username
+          - name: RABBIT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ template "hacktoberfest.fullname" . }}-rabbit-mq
+                key: password
+{{- end }}
+{{- if  eq (index .Values "deployment" "annotations" "k8s.hacktoberfest.com.br/db-mongo") "true" }}
+          - name: MONGODB_HOST
+            valueFrom:
+              secretKeyRef: 
+                name: {{ template "hacktoberfest.fullname" . }}-db-mongo
+                key: host
+          - name: MONGODB_PORT
+            valueFrom:
+              secretKeyRef: 
+                name: {{ template "hacktoberfest.fullname" . }}-db-mongo
+                key: port
+          - name: MONGODB_DATABASE
+            valueFrom:
+              secretKeyRef:
+                name: {{ template "hacktoberfest.fullname" . }}-db-mongo
+                key: database_username
+          - name: MONGODB_USERNAME
+            valueFrom:
+              secretKeyRef: 
+                name: {{ template "hacktoberfest.fullname" . }}-db-mongo
+                key: username
+          - name: MONGODB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ template "hacktoberfest.fullname" . }}-db-mongo
+                key: password
+{{- end }}
+{{- if  eq (index .Values "deployment" "annotations" "k8s.hacktoberfest.com.br/db-redis") "true" }}
+          - name: REDIS_HOST
+            valueFrom:
+              secretKeyRef: 
+                name: {{ template "hacktoberfest.fullname" . }}-redis
+                key: host
+          - name: REDIS_PORT
+            valueFrom:
+              secretKeyRef: 
+                name: {{ template "hacktoberfest.fullname" . }}-redis
+                key: port
+          - name: REDIS_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: {{ template "hacktoberfest.fullname" . }}-redis
+                key: username
+          - name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef: 
+                name: {{ template "hacktoberfest.fullname" . }}-redis
+                key: password
+{{- end }}
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+      volumes:
+        - name: hacktoberfest
+          persistentVolumeClaim:
+            claimName: {{ template "hacktoberfest.fullname" . }}
